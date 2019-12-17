@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<settings>
+    <input_folder>input</input_folder>
+    <output_folder>processed</output_folder>
+	<username>sa</username>
+	<password>sa</password>
+	<url>jdbc:h2:tcp://localhost/~/test</url>
+</settings>
