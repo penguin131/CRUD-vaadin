@@ -1,6 +1,7 @@
-com\CustomerService.class
 com\MyUI$MyUIServlet.class
-com\CustomerForm.class
+com\model\DatabaseActions.class
 com\MyUI.class
-com\Customer.class
-com\CustomerStatus.class
+com\utils\HibernateUtil.class
+com\utils\HibernateSessionFactory.class
+com\model\AuthorsEntity.class
+com\utils\DbConfiguration.class
