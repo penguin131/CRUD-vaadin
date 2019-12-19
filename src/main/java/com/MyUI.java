@@ -7,14 +7,13 @@ import com.vaadin.annotations.Theme;
 import com.vaadin.annotations.VaadinServletConfiguration;
 import com.vaadin.data.Binder;
 import com.vaadin.data.ValidationException;
+import com.vaadin.data.ValidationResult;
 import com.vaadin.data.ValueProvider;
-import com.vaadin.data.validator.StringLengthValidator;
 import com.vaadin.server.Setter;
 import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinServlet;
 import com.vaadin.ui.*;
-import com.utils.HibernateUtil;
-import org.hibernate.Session;
+import com.vaadin.ui.components.grid.MultiSelectionModel;
 import java.util.List;
 
 @Theme("mytheme")
@@ -24,6 +23,7 @@ public class MyUI extends UI {
     private final HorizontalLayout nestedLayout = new HorizontalLayout();
     private FormLayout newAuthorForm = new FormLayout();
     private Button addAuthorButton = new Button("Add new author");
+    private Button deleteButton = new Button("Delete selected items");
 
     @Override
     protected void init(VaadinRequest vaadinRequest) {
@@ -37,22 +37,27 @@ public class MyUI extends UI {
         layout.addComponent(newAuthorForm);
         setNewAuthorForm();
 
-
         setContent(layout);
     }
 
     private void setAuthorsEntityGrid() {
-        final Session session = HibernateUtil.getHibernateSession();
-        session.beginTransaction();
-        List authors = session
-                .createQuery("from AuthorsEntity")
-                .list();
-        session.close();
         authorsEntityGrid.setColumns("authorId", "name");
         authorsEntityGrid.setItems(
-                authors
+                DatabaseActions.findAllAuthors()
         );
         authorsEntityGrid.setVisible(true);
+        MultiSelectionModel<AuthorsEntity> selectionModel
+                = (MultiSelectionModel<AuthorsEntity>) authorsEntityGrid.setSelectionMode(Grid.SelectionMode.MULTI);
+        selectionModel.addMultiSelectionListener(event -> {
+            Notification.show(String.valueOf(selectionModel.getSelectedItems().size()));
+        });
+        layout.addComponent(deleteButton);
+        addAuthorButton.addClickListener(clickEvent -> {
+            for (AuthorsEntity author : selectionModel.getSelectedItems()) {
+                DatabaseActions.deleteAuthorForId(author.getAuthorId());
+            }
+            authorsEntityGrid.setItems(DatabaseActions.findAllAuthors());
+        });
     }
 
     private void setNewAuthorForm() {
@@ -67,13 +72,13 @@ public class MyUI extends UI {
                 event -> {
                     try {
                         binder.writeBean(newAuthor);
-                        DatabaseActions.insertAuthorToDB(newAuthor);
+                        DatabaseActions.insertAuthor(newAuthor);
                         newAuthor.setName("");
                         switchVisible();
                     } catch (ValidationException e) {
-                        List errors = e.getValidationErrors();
+                        List<ValidationResult> errors = e.getValidationErrors();
                         for (int i = 0; i < errors.size(); i++) {
-                            Notification.show(e.getValidationErrors().get(i).getErrorMessage());
+                            Notification.show(errors.get(i).getErrorMessage());
                         }
                     }
                 });
@@ -103,12 +108,13 @@ public class MyUI extends UI {
     private void switchVisible() {
         if (!authorsEntityGrid.isVisible()) {
             addAuthorButton.setCaption("Add new author");
-            setAuthorsEntityGrid();
+            authorsEntityGrid.setItems(DatabaseActions.findAllAuthors());
         } else {
             addAuthorButton.setCaption("Go back!");
-            authorsEntityGrid.setVisible(!authorsEntityGrid.isVisible());
         }
         newAuthorForm.setVisible(!newAuthorForm.isVisible());
+        authorsEntityGrid.setVisible(!authorsEntityGrid.isVisible());
+        deleteButton.setVisible(!deleteButton.isVisible());
     }
 
     @WebServlet(urlPatterns = "/*", name = "MyUIServlet", asyncSupported = true)
