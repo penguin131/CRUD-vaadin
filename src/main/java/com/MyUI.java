@@ -13,51 +13,69 @@ import com.vaadin.server.Setter;
 import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinServlet;
 import com.vaadin.ui.*;
+import com.vaadin.ui.components.grid.Editor;
 import com.vaadin.ui.components.grid.MultiSelectionModel;
 import java.util.List;
+import java.util.Objects;
 
 @Theme("mytheme")
 public class MyUI extends UI {
     private Grid<AuthorsEntity> authorsEntityGrid = new Grid<>(AuthorsEntity.class);
-    private final VerticalLayout layout = new VerticalLayout();
-    private final HorizontalLayout nestedLayout = new HorizontalLayout();
+    private final VerticalLayout generalLayout = new VerticalLayout();
+    private final HorizontalLayout upperLayout = new HorizontalLayout();
     private FormLayout newAuthorForm = new FormLayout();
     private Button addAuthorButton = new Button("Add new author");
     private Button deleteButton = new Button("Delete selected items");
+    private GridLayout topGrid = new GridLayout(1, 1);
 
     @Override
     protected void init(VaadinRequest vaadinRequest) {
-        nestedLayout.setWidth("100%");
-        layout.addComponent(nestedLayout);
-        layout.addComponent(authorsEntityGrid);
         setAuthorsEntityGrid();
-
-        createNewAuthorButton();
-
-        layout.addComponent(newAuthorForm);
+        createTopGrid();
         setNewAuthorForm();
-
-        setContent(layout);
+        authorsEntityGrid.getEditor().setBuffered(true);
+        upperLayout.setWidth("100%");
+        generalLayout.addComponent(upperLayout);
+        generalLayout.addComponent(authorsEntityGrid);
+        generalLayout.addComponent(newAuthorForm);
+        generalLayout.addComponent(deleteButton);
+        upperLayout.addComponent(topGrid);
+        setContent(generalLayout);
     }
 
     private void setAuthorsEntityGrid() {
-        authorsEntityGrid.setColumns("authorId", "name");
-        authorsEntityGrid.setItems(
-                DatabaseActions.findAllAuthors()
-        );
         authorsEntityGrid.setVisible(true);
-        MultiSelectionModel<AuthorsEntity> selectionModel
-                = (MultiSelectionModel<AuthorsEntity>) authorsEntityGrid.setSelectionMode(Grid.SelectionMode.MULTI);
-        selectionModel.addMultiSelectionListener(event -> {
-            Notification.show(String.valueOf(selectionModel.getSelectedItems().size()));
-        });
-        layout.addComponent(deleteButton);
-        addAuthorButton.addClickListener(clickEvent -> {
+        authorsEntityGrid.setItems(
+                Objects.requireNonNull(DatabaseActions.findAllAuthors())
+        );
+        authorsEntityGrid.getColumn("name").setHidden(true);
+        authorsEntityGrid.getColumn("authorId").setCaption("Id");
+        //table delete
+        MultiSelectionModel<AuthorsEntity> selectionModel = (MultiSelectionModel<AuthorsEntity>)
+                authorsEntityGrid.setSelectionMode(Grid.SelectionMode.MULTI);
+        deleteButton.addClickListener(clickEvent -> {
             for (AuthorsEntity author : selectionModel.getSelectedItems()) {
                 DatabaseActions.deleteAuthorForId(author.getAuthorId());
+                authorsEntityGrid.setItems(Objects.requireNonNull(DatabaseActions.findAllAuthors()));
             }
-            authorsEntityGrid.setItems(DatabaseActions.findAllAuthors());
+            authorsEntityGrid.setItems(Objects.requireNonNull(DatabaseActions.findAllAuthors()));
         });
+        //edit mode
+        authorsEntityGrid.getEditor().setEnabled(true);//включаю режим с выпадающим окошком
+        Editor<AuthorsEntity> editor = authorsEntityGrid.getEditor();
+        editor.addSaveListener(editorSaveEvent -> {
+            DatabaseActions.updateAuthor(editorSaveEvent.getBean());
+            authorsEntityGrid.setItems(Objects.requireNonNull(DatabaseActions.findAllAuthors()));
+        });
+        TextField doneField = new TextField();
+        Binder<AuthorsEntity> binder = authorsEntityGrid.getEditor().getBinder();
+        binder.bind(doneField, AuthorsEntity::getName, AuthorsEntity::setName);
+        Binder.Binding<AuthorsEntity, String> doneBinding =
+                binder.bind(doneField, AuthorsEntity::getName, AuthorsEntity::setName);
+        authorsEntityGrid.addColumn(author -> String.valueOf(author.getName()))
+                .setCaption("new author")
+                .setWidth(345)
+                .setEditorBinding(doneBinding);
     }
 
     private void setNewAuthorForm() {
@@ -77,8 +95,8 @@ public class MyUI extends UI {
                         switchVisible();
                     } catch (ValidationException e) {
                         List<ValidationResult> errors = e.getValidationErrors();
-                        for (int i = 0; i < errors.size(); i++) {
-                            Notification.show(errors.get(i).getErrorMessage());
+                        for (ValidationResult error : errors) {
+                            Notification.show(error.getErrorMessage());
                         }
                     }
                 });
@@ -91,24 +109,18 @@ public class MyUI extends UI {
         newAuthorForm.setVisible(false);
     }
 
-    private void createNewAuthorButton() {
-        GridLayout localGrid = new GridLayout(2, 2);
-        Button logout = new Button("Logout");
-
+    private void createTopGrid() {
         addAuthorButton.addClickListener(clickEvent ->
                 switchVisible());
-        localGrid.setWidth("100%");
-        localGrid.addComponent(addAuthorButton, 0, 0);
-        localGrid.addComponent(logout, 1, 0);
-        localGrid.setComponentAlignment(addAuthorButton, Alignment.TOP_LEFT);
-        localGrid.setComponentAlignment(logout, Alignment.TOP_RIGHT);
-        nestedLayout.addComponent(localGrid);
+        topGrid.setWidth("100%");
+        topGrid.addComponent(addAuthorButton, 0, 0);
+        topGrid.setComponentAlignment(addAuthorButton, Alignment.TOP_LEFT);
     }
 
     private void switchVisible() {
         if (!authorsEntityGrid.isVisible()) {
             addAuthorButton.setCaption("Add new author");
-            authorsEntityGrid.setItems(DatabaseActions.findAllAuthors());
+            authorsEntityGrid.setItems(Objects.requireNonNull(DatabaseActions.findAllAuthors()));
         } else {
             addAuthorButton.setCaption("Go back!");
         }

@@ -1,7 +1,0 @@
-com\MyUI$MyUIServlet.class
-com\model\DatabaseActions.class
-com\MyUI.class
-com\utils\HibernateUtil.class
-com\utils\HibernateSessionFactory.class
-com\model\AuthorsEntity.class
-com\utils\DbConfiguration.class
